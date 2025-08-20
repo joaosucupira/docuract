@@ -2,8 +2,11 @@ import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
+from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
 from langchain.vectorstores import FAISS
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import ConversationalRetrievalChain
 
 def get_pdf_text(pdf_docs):
     text = ""
@@ -41,10 +44,23 @@ def get_vectorstore_instruct(text_chunks):
     )
     return vectorstore
 
+def get_conversation_chain(vectorstore):
+    llm = ChatOpenAI()
+    mem = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
+    conversation_chain = ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=vectorstore.as_retriever(),
+        memory=mem
+    )
+    return conversation_chain
+
 
 def main():
     load_dotenv()
     st.set_page_config(page_title="docuract", page_icon=":books:")
+
+    if 'conversation' not in st.session_state:
+        st.session_state.conversation = None
     
     st.header("Docuract Hub :books:")
     st.text_input("Interact with your documents")
@@ -65,7 +81,11 @@ def main():
                 # vectorestore = get_vectorstore(text_chunks)
 
                 vectorstore = get_vectorstore_instruct(text_chunks)
-        
+
+                st.session_state.conversation = get_conversation_chain(vectorstore)
+
+    
+    # st.session_state.conversation
                 
 
 
