@@ -1,12 +1,19 @@
 import streamlit as st
+import os
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
+
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.chat_models import ChatOpenAI
+# from langchain.chat_models import ChatOpenAI
+import google.generativeai as genai
 from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+
+from htmlTemplates import css, bot_template, user_template
 
 def get_pdf_text(pdf_docs):
     text = ""
@@ -45,7 +52,9 @@ def get_vectorstore_instruct(text_chunks):
     return vectorstore
 
 def get_conversation_chain(vectorstore):
-    llm = ChatOpenAI()
+    # llm = ChatOpenAI() 
+    # llm = genai.GenerativeModel()
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
     mem = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
     conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
@@ -54,16 +63,40 @@ def get_conversation_chain(vectorstore):
     )
     return conversation_chain
 
+def handle_userinput(user_question):
+    response = st.session_state.conversation({"question": user_question})
+    st.write(response)
+
+def verify_google_api_key():
+    try:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY não encontrada no arquivo .env")
+        genai.configure(api_key=api_key)
+    except Exception as e:
+        st.error(f"Erro ao configurar a chave de API do Gemini: {e}")
+        st.stop()
 
 def main():
     load_dotenv()
+    verify_google_api_key()
+
     st.set_page_config(page_title="docuract", page_icon=":books:")
+
+    st.write(css, unsafe_allow_html=True)
 
     if 'conversation' not in st.session_state:
         st.session_state.conversation = None
     
     st.header("Docuract Hub :books:")
-    st.text_input("Interact with your documents")
+    # st.text_input("Interact with your documents")
+
+    user_question = st.text_input("Interaja com seus documentos:")
+    if user_question:
+        handle_userinput(user_question)
+
+    st.write(user_template.replace("{{MSG}}", "Olá, Docuract. Tudo bem com você?"), unsafe_allow_html=True)
+    st.write(bot_template.replace("{{MSG}}", "Olá humano, tudo certo! Como posso ajudá-lo?"), unsafe_allow_html=True)
 
     with st.sidebar:
         st.subheader("Documents")
