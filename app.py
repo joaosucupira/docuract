@@ -11,6 +11,7 @@ from langchain.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.llms import HuggingFaceHub
 
 
 from htmlTemplates import css, bot_template, user_template
@@ -54,7 +55,9 @@ def get_vectorstore_instruct(text_chunks):
 def get_conversation_chain(vectorstore):
     # llm = ChatOpenAI() 
     # llm = genai.GenerativeModel()
+    # llm = HuggingFaceHub(repo_id="google/flan-t5-xl", task="text-generation", model_kwargs={"temperature": 0.5, "max_length": 512})
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
+    
     mem = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
     conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
@@ -65,7 +68,13 @@ def get_conversation_chain(vectorstore):
 
 def handle_userinput(user_question):
     response = st.session_state.conversation({"question": user_question})
-    st.write(response)
+    st.session_state.chat_history = response['chat_history']
+
+    for i, msg in enumerate(st.session_state.chat_history):
+        if i % 2 == 0:
+            st.write(user_template.replace("{{MSG}}", msg.content), unsafe_allow_html=True)
+        else:
+            st.write(bot_template.replace("{{MSG}}", msg.content), unsafe_allow_html=True)
 
 def verify_google_api_key():
     try:
@@ -87,6 +96,9 @@ def main():
 
     if 'conversation' not in st.session_state:
         st.session_state.conversation = None
+
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = None
     
     st.header("Docuract Hub :books:")
     # st.text_input("Interact with your documents")
